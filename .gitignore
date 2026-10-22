@@ -19,4 +19,4 @@ cypress.env.json
 
 # OS files
 .DS_Store
-Thumbs.dbcypress/e2e/login.cy.ts
+Thumbs.db
