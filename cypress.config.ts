@@ -22,5 +22,12 @@ export default defineConfig({
     viewportHeight: 720,
     video: false,
     screenshotOnRunFailure: true,
+    // Mondly's load event waits on third-party scripts and sometimes the
+    // first request to the live site times out.
+    pageLoadTimeout: 90000,
+    retries: {
+      runMode: 1,
+      openMode: 0,
+    },
   },
 });

@@ -21,7 +21,7 @@ describe('Mondly Language Selection', () => {
   beforeEach(() => {
     // Visit the Mondly app homepage
     // baseUrl is set in cypress.config.ts, so '/' means https://app.mondly.com/
-    cy.visit('/', { timeout: 30000 });
+    cy.openMondly();
   });
 
   /**
@@ -51,9 +51,6 @@ describe('Mondly Language Selection', () => {
     // Verify that "French" is now visible (meaning target language was selected)
     cy.contains('French').should('be.visible');
     
-    // Wait a moment for the dropdown to fully close and UI to stabilize
-    cy.wait(500);
-    
     // STEP 3: Select learning level as "Intermedio" (Intermediate)
     // This slides the selector to "Intermedio" position and clicks it
     cy.selectLevel('Intermedio');
@@ -64,22 +61,15 @@ describe('Mondly Language Selection', () => {
     // STEP 4: Click on "Iniciar sesión" (Log in)
     // This link appears at the bottom of the modal after completing the onboarding steps
     cy.goToLogin();
-    
-    // Wait for the login form to appear
-    cy.wait(1000);
-    
-  // STEP 5 & 6: Enter credentials using the custom command
-// This uses the credentials from your .env file securely
-cy.enterCredentials(Cypress.env('userEmail'), Cypress.env('userPassword'));
-    
-    // STEP 7: Click the "Iniciar sesión" button to submit the login form
-    // Find the submit button by its type attribute
-    cy.get('button[type="submit"]')
-      .should('be.visible')
-      .click();
-    
-    // Wait for login to process
-    cy.wait(2000);
+
+    // STEP 5 & 6: Enter credentials using the custom command
+    // This uses the credentials from your .env file securely
+    cy.enterCredentials(Cypress.env('userEmail'), Cypress.env('userPassword'));
+
+    // STEP 7: Submit the login form and confirm the home screen
+    cy.submitLogin();
+    cy.acceptCookies();
+    cy.verifyCategories();
   });
 
   /**

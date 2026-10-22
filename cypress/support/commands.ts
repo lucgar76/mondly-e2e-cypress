@@ -3,6 +3,7 @@
 declare global {
     namespace Cypress {
       interface Chainable {
+        openMondly(): Chainable<void>;
         selectMotherLanguage(language: string): Chainable<void>;
         selectTargetLanguage(language: string): Chainable<void>;
         selectLevel(level: string): Chainable<void>;
@@ -16,39 +17,38 @@ declare global {
     }
   }
   
+  const exactOption = (language: string): RegExp => {
+    const escaped = language.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^\\s*${escaped}\\s*$`);
+  };
+
   /**
-   * Select Mother Language (I Speak)
-   * 
-   * This command changes the "I speak" language dropdown.
-   * By default, it shows "English" and we change it to the desired language.
-   * 
-   * @param language - The language to select (e.g., 'Español', 'Français', 'Deutsch')
-   * 
-   * How it works:
-   * 1. Finds and clicks the current language button (initially "English") to open dropdown
-   * 2. Clicks the desired language from the dropdown list
-   * 3. Waits for the UI to update
-   * 4. Clicks the selected language button again to close the dropdown
-   * 5. Verifies the selection was successful
+   * Open a Mondly dropdown and choose an option.
+   *
+   * The menu ignores selection while its 250ms open animation is running.
+   * A click during that window updates the label but leaves the list open.
    */
+  const selectFromDropdown = (root: string, language: string) => {
+    cy.get(`${root} .selected-item`, { timeout: 20000 }).should('be.visible').click();
+    cy.get(`${root} .options li`, { timeout: 10000 }).should('be.visible');
+    cy.wait(400);
+
+    cy.contains(`${root} .options li`, exactOption(language))
+      .scrollIntoView()
+      .click();
+
+    cy.get(`${root} .options li`).should('not.exist');
+    cy.get(`${root} .selected-item`).should('be.visible').and('contain', language);
+  };
+
+  Cypress.Commands.add('openMondly', () => {
+    cy.visit('/', { timeout: 90000 });
+    cy.get('.mother-dropdown', { timeout: 30000 }).should('be.visible');
+  });
+
   Cypress.Commands.add('selectMotherLanguage', (language: string) => {
-    // Step 1: Click on "English" to open the dropdown
-    // .should('be.visible') ensures the element is visible before clicking
-    cy.contains('English').should('be.visible').click();
-    
-    // Step 2: Select the desired language from the list
-    // force: true bypasses actionability checks (useful if element is covered by animation)
-    cy.contains(language).click({ force: true });
-    
-    // Step 3: Wait for the UI to update after selection
-    cy.wait(500);
-    
-    // Step 4: Click the selected language button again to close the dropdown
-    // This ensures the dropdown is dismissed and won't block other elements
-    cy.contains(language).should('be.visible').click({ force: true });
-    
-    // Step 5: Verify the language was selected and dropdown is closed
-    cy.contains(language).should('be.visible');
+    // Mother-language names are native names (Español, English, Français).
+    selectFromDropdown('.mother-dropdown', language);
   });
   
   /**
@@ -60,32 +60,14 @@ declare global {
    * @param language - The language you want to learn (e.g., 'French', 'Italian', 'German')
    * 
    * How it works:
-   * 1. Clicks the "Seleccionar" dropdown to open the language list
-   * 2. Scrolls down to the desired language (in case it's not visible)
-   * 3. Clicks the language to select it
-   * 4. Waits for the UI to update
-   * 5. Clicks the selected language button again to close the dropdown
+   * 1. Opens the target-language dropdown
+   * 2. Waits until the open animation finishes
+   * 3. Clicks the language option, which closes the menu
    */
   Cypress.Commands.add('selectTargetLanguage', (language: string) => {
-    // Step 1: Click "Seleccionar" to open the target language dropdown
-    cy.contains('Seleccionar').click({ force: true });
-    
-    // Step 2: Find the language in the list and scroll to it if needed
-    // .scrollIntoView() ensures the element is visible in the viewport
-    // This is especially important for languages lower in the list like French
-    cy.contains(language)
-      .scrollIntoView()
-      .click({ force: true });
-    
-    // Step 3: Wait for the UI to update after selection
-    cy.wait(500);
-    
-    // Step 4: Click the selected language button again to close the dropdown
-    // This ensures the dropdown is dismissed and won't block other elements
-    cy.contains(language).should('be.visible').click({ force: true });
-    
-    // Step 5: Verify the language was selected and dropdown is closed
-    cy.contains(language).should('be.visible');
+    // Target-language names stay in English (French, German) after the UI
+    // switches to the mother language.
+    selectFromDropdown('.target-dropdown', language);
   });
   
   /**
@@ -105,31 +87,25 @@ declare global {
    * The interface has clickable tabs that control the level selection.
    */
   Cypress.Commands.add('selectLevel', (level: string) => {
-    // Wait for animations and dropdowns to fully close
-    cy.wait(1500);
-    
-    // Scroll to the level selection area
-    cy.contains('Principiante', { timeout: 10000 })
-      .scrollIntoView();
-    
-    cy.wait(500);
-    
-    // Find the span containing the level text and click on the corresponding clickable tab
-    // The structure has clickable .tab divs above the text labels
-    // We need to click the nth tab based on which level is selected
     const levelIndex: { [key: string]: number } = {
-      'Principiante': 1,  // First tab
-      'Intermedio': 2,    // Second tab
-      'Avanzado': 3       // Third tab
+      Principiante: 0,
+      Intermedio: 1,
+      Avanzado: 2,
     };
-    
-    // Click on the nth clickable tab (not the text tab)
-    cy.get('.tabs-inner .tab[data-ember-action]')
-      .eq(levelIndex[level] - 1)  // eq() is 0-indexed, so subtract 1
+
+    const index = levelIndex[level];
+    if (index === undefined) {
+      throw new Error(`Unknown Mondly level "${level}"`);
+    }
+
+    // Clickable tabs are direct children. The visible labels live in
+    // .tab-text and do not receive the select action.
+    cy.get('.sliding-navigation.difficulty .tabs-inner > .tab', { timeout: 15000 })
+      .eq(index)
       .click({ force: true });
-    
-    // Wait to ensure selection registered
-    cy.wait(500);
+
+    cy.contains('.sliding-navigation.difficulty .tab-text.selected', level, { timeout: 10000 })
+      .should('be.visible');
   });
   
   /**
@@ -142,15 +118,13 @@ declare global {
    * We click on "Iniciar sesión" to go to the login page.
    */
   Cypress.Commands.add('goToLogin', () => {
-    // Wait for the login link to appear after completing onboarding
-    cy.wait(1000);
-    
-    // Click on the "Iniciar sesión" link
-    // This finds an <a> element containing the exact text "Iniciar sesión"
-    cy.contains('a', 'Iniciar sesión')
+    // The first link is login and the second is sign up. The labels change
+    // with the mother language ("Log in" / "Iniciar sesión").
+    cy.get('.connect a', { timeout: 10000 })
+      .first()
       .should('be.visible')
       .scrollIntoView()
-      .click({ force: true });
+      .click();
   });
   
   /**
@@ -240,7 +214,7 @@ declare global {
   Cypress.Commands.add('verifyCategories', () => {
     // Check for "Lección Diaria" (Daily Lesson) text - this appears after successful login
     // timeout: 10000 gives it 10 seconds to appear (page might load slowly)
-    cy.contains('Lección Diaria', { timeout: 10000 }).should('be.visible');
+    cy.contains('Lección Diaria', { timeout: 20000 }).should('be.visible');
     
     // Verify the URL changed to the home page
     // .should('include', '/home') checks that the URL contains '/home'
@@ -265,7 +239,7 @@ declare global {
    */
   Cypress.Commands.add('completeOnboardingAndLogin', (email: string, password: string) => {
     // Visit the homepage
-    cy.visit('/');
+    cy.openMondly();
     
     // Complete language selection
     cy.selectMotherLanguage('Español');

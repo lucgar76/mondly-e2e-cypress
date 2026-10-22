@@ -21,7 +21,7 @@ describe('Mondly Onboarding and Login', () => {
   beforeEach(() => {
     // Visit the Mondly app homepage
     // timeout: 30000 gives the page 30 seconds to load (useful for slow networks)
-    cy.visit('/', { timeout: 30000 });
+    cy.openMondly();
   });
 
   /**
@@ -45,20 +45,9 @@ describe('Mondly Onboarding and Login', () => {
     // Choose Intermediate (Intermedio) as the learning level
     cy.selectLevel('Intermedio');
 
-    // STEP 2: Wait for UI to stabilize
-    // Small delay to ensure any animations or transitions complete
-    cy.wait(1000); 
-
-    // STEP 3: Navigate to Login
-    // Click the "Log in / Sign up" button in the menu
-    // Using text-based selector is more reliable than CSS classes
-    cy.contains('Iniciar sesión / Registrarte')
-      .should('be.visible')
-      .click();
-
-    // Ensure the Login Modal/Tab is active
-    // Click the login link again to make sure we're on the login tab (not signup)
-    cy.contains('a', 'Iniciar sesión / Registrarte').click();
+    // STEP 2: Navigate to Login
+    // Login and sign up are separate links. The copy follows the mother language.
+    cy.goToLogin();
 
     // STEP 4: Enter Login Credentials
     // Get credentials from environment variables (set in .env file)
